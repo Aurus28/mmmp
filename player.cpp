@@ -16,6 +16,8 @@ std::atomic<bool> exit_flag(false); // atomic -> safer when threading
 
 // method declarations
 void inputListener();
+const char* message_type_to_str(int type);
+void dump_message_process(sd_bus_message *msg);
 
 
 // vtables
@@ -31,7 +33,6 @@ int main() {
 	sd_bus *bus = nullptr;
 	sd_bus_slot *slot = nullptr;
 	sd_bus_message *processed_message = nullptr;
-	uint8_t *processed_message_type;
 	const char *name = "org.mpris.MediaPlayer2.Mmmp";
 
 
@@ -75,10 +76,7 @@ int main() {
 		} else if(error_code == 0) {
 			sd_bus_wait(bus, 50000);
 		} else {
-			std::cout << sd_bus_prefix << "Processed a message:" << std::endl;
-			sd_bus_message_get_type(processed_message, processed_message_type);
-			// TODO (left of here) print processed_message_type and/or retrun of sd_bus_message_get_type (it might still return -22)
-			sd_bus_message_dump(processed_message, NULL, 0);
+			dump_message_process(processed_message);
 		}
 	}
 
@@ -105,5 +103,46 @@ void inputListener() {
 			exit_flag = true;
 			break;
 		}
+	}
+}
+
+const char* message_type_to_str(int type) {
+	switch(type) {
+	case SD_BUS_MESSAGE_METHOD_CALL: 
+		return "SD_BUS_MESSAGE_METHOD_CALL";
+	case SD_BUS_MESSAGE_METHOD_RETURN: 
+		return "SD_BUS_MESSAGE_METHOD_RETURN";
+	case SD_BUS_MESSAGE_METHOD_ERROR: 
+		return "SD_BUS_MESSAGE_METHOD_ERROR";
+	case SD_BUS_MESSAGE_SIGNAL: 
+		return "SD_BUS_MESSAGE_SIGNAL";
+	default: 
+		return "UNKNOWN";
+	}
+}
+
+
+void dump_message_process(sd_bus_message *msg) {
+	int err;
+	uint8_t processed_message_type;
+
+	std::cout << sd_bus_prefix << "Processed a message:" << std::endl;
+
+	// print message info
+	if(msg != NULL) {
+		err = sd_bus_message_get_type(msg, &processed_message_type);
+		std::cout << "Message type read with return value: " << strerror(-err) << std::endl;
+
+		if(err < 0 || processed_message_type == NULL) {
+			std::cout << "something went wrong while reading message type" << std::endl;
+			return;
+		}
+
+		int temp = (int)(processed_message_type);
+		std::cout << sd_bus_prefix << "Message type def you will never get a uint8_t* ined: " << message_type_to_str(temp) << std::endl;
+
+		sd_bus_message_dump(msg, NULL, 0);
+	} else {
+		std::cout << "Processed message was NULL" << std::endl;
 	}
 }
